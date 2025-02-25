@@ -2,7 +2,7 @@ package compiler.Lexer;
 import java.io.Reader;
 
 public class Lexer {
-    public enum Symbols{
+    public enum SymbolType{
         COMMENT,
         IDENTIFIER,
         KEYWORD,
