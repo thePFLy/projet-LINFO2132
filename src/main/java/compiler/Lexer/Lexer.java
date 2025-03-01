@@ -2,29 +2,35 @@ package compiler.Lexer;
 import java.io.IOException;
 import java.io.PushbackReader;
 import java.io.Reader;
-import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Arrays;
 
 public class Lexer {
     public enum SymbolType {
-        COMMENT, IDENTIFIER, KEYWORD, INTEGER, FLOAT, STRING, BOOLEAN, SYMBOL, EOF
+        COMMENT, IDENTIFIER, KEYWORD, INTEGER, FLOAT, STRING, BOOLEAN, SYMBOL, EOF, FUNCTION, FUNCTION_CALL, USER_TYPE, RECORD, FIELD_OPERATOR
     }
 
     private final PushbackReader reader;
     private int currentChar;
-//    private static final String[] KEYWORDS =  {"free", "final", "rec", "fun", "for", "while", "if", "else", "return"};
+    private int line = 1;
+    private int column = 0;
     private static final String[] BOOLEAN_VALUES = {"true", "false"};
     private static final String SYMBOLS = "=+-*/%(){}[].,;<>!&|";
-    private ArrayList<String> KEYWORDS = new ArrayList<>(Arrays.asList("free", "final", "rec", "fun", "for", "while", "if", "else", "return"));
+    private final ArrayList<String> KEYWORDS = new ArrayList<>(Arrays.asList("free", "final", "rec", "fun", "for", "while", "if", "else", "return"));
+
     public Lexer(Reader input) {
         this.reader = new PushbackReader(input);
-        advance();  // Read the first character
+        advance();
     }
 
     private void advance() {
         try {
             currentChar = reader.read();
+            column++;
+            if (currentChar == '\n') {
+                line++;
+                column = 0;
+            }
         } catch (IOException e) {
             currentChar = -1;
         }
@@ -35,15 +41,26 @@ public class Lexer {
             advance();
         }
     }
-    //TODO:check for function names  + built in functions + own types ex: Point rec {...} + index operator [i] + record field operator . in (a.x) + concatenation (+) in strings and others
-    //TODO:see code example_file
+
+    private boolean isBuiltInFunction(String word) {
+        String[] builtInFunctions = {
+                "readInt", "readFloat", "readString", "writeInt", "writeFloat", "write", "writeln"
+        };
+        for (String func : builtInFunctions) {
+            if (word.equals(func)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
 
     public Symbol getNextSymbol() {
         skipWhitespace();
 
         if (currentChar == -1) return new Symbol(SymbolType.EOF, "EOF");
 
-        //  comments
+        // comments
         if (currentChar == '$') {
             while (currentChar != '\n' && currentChar != -1) advance();
             return getNextSymbol();
@@ -57,13 +74,40 @@ public class Lexer {
                 advance();
             }
             String word = sb.toString();
-            for (String keyword : KEYWORDS) {
-                if (word.equals(keyword)) return new Symbol(SymbolType.KEYWORD, word);
+
+            if (KEYWORDS.contains(word)) return new Symbol(SymbolType.KEYWORD, word);
+            if (Arrays.asList(BOOLEAN_VALUES).contains(word)) return new Symbol(SymbolType.BOOLEAN, word);
+            if (isBuiltInFunction(word)) return new Symbol(SymbolType.KEYWORD, word);
+
+            skipWhitespace();
+            if (currentChar == '(') {
+                advance();
+                return new Symbol(SymbolType.FUNCTION_CALL, word);
             }
-            for (String boolVal : BOOLEAN_VALUES) {
-                if (word.equals(boolVal)) return new Symbol(SymbolType.BOOLEAN, word);
-            }
+
             return new Symbol(SymbolType.IDENTIFIER, word);
+        }
+
+
+        // field operator (.)
+        if (currentChar == '.') {
+            advance();
+            return new Symbol(SymbolType.FIELD_OPERATOR, ".");
+        }
+
+        if (Character.isDigit(currentChar) || currentChar == '.') {
+            StringBuilder sb = new StringBuilder();
+            boolean isFloat = false;
+
+            while (Character.isDigit(currentChar) || currentChar == '.') {
+                if (currentChar == '.') {
+                    if (isFloat) break;
+                    isFloat = true;
+                }
+                sb.append((char) currentChar);
+                advance();
+            }
+            return new Symbol(isFloat ? SymbolType.FLOAT : SymbolType.INTEGER, sb.toString());
         }
 
         // numbers (integers and floats)
@@ -83,6 +127,8 @@ public class Lexer {
                 sb.append((char) currentChar);
                 advance();
             }
+            if (sb.toString().endsWith(".")) sb.append("0");
+
             return new Symbol(isFloat ? SymbolType.FLOAT : SymbolType.INTEGER, sb.toString());
         }
 
@@ -102,11 +148,11 @@ public class Lexer {
                 }
                 advance();
             }
-            advance();  // Skip closing quote
+            advance();
             return new Symbol(SymbolType.STRING, sb.toString());
         }
 
-        // Handle multi-character operators (==, !=, <=, >=, &&, ||)
+        // Handle multi-character operators (==, !=, <=, >=, &&, ||, [], +)
         if (SYMBOLS.indexOf(currentChar) != -1) {
             StringBuilder sb = new StringBuilder();
             sb.append((char) currentChar);
@@ -120,20 +166,34 @@ public class Lexer {
                 advance();
             }
 
+            // rec
+            if (currentChar == '{') {
+                advance(); // Consume '{'
+                do {
+                    advance(); // Ignore everything inside
+                } while (currentChar != '}' && currentChar != -1);
+                if (currentChar == '}') {
+                    advance(); // Consume '}'
+                }
+                return new Symbol(SymbolType.SYMBOL, "{...}");
+            }
+
+            // Concat +
+            if (sb.charAt(0) == '+') {
+                return new Symbol(SymbolType.SYMBOL, "+");
+            }
+
+            // Handle index operator '[' and ']'
+            if (sb.charAt(0) == '[' || sb.charAt(0) == ']') {
+                return new Symbol(SymbolType.SYMBOL, String.valueOf(sb.charAt(0)));
+            }
+
             return new Symbol(SymbolType.SYMBOL, sb.toString());
         }
 
         // If unrecognized character is encountered
-        //TODO:error handling
-
-
-        try {
-            throw new SyntaxErrorException("unrecognised token");
-        }
-        catch (SyntaxErrorException e) {
-            Symbol unknown = new Symbol(SymbolType.SYMBOL, Character.toString((char) currentChar));
-            advance();
-            return unknown;
-        }
+        LexerError.reportError(line, column, (char) currentChar);
+        advance();
+        return getNextSymbol();
     }
 }
