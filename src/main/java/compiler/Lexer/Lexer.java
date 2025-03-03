@@ -7,7 +7,7 @@ import java.util.Arrays;
 
 public class Lexer {
     public enum SymbolType {
-        COMMENT, IDENTIFIER, KEYWORD, INTEGER, FLOAT, STRING, BOOLEAN, SYMBOL, EOF, FUNCTION, FUNCTION_CALL, USER_TYPE, RECORD, FIELD_OPERATOR
+        IDENTIFIER, KEYWORD, INTEGER, FLOAT, STRING, BOOLEAN, SYMBOL, EOF, REC, FIELD_OPERATOR, TYPE
     }
 
     private final PushbackReader reader;
@@ -16,9 +16,13 @@ public class Lexer {
     private int column = 0;
     private static final String[] BOOLEAN_VALUES = {"true", "false"};
     private static final String SYMBOLS = "=+-*/%(){}[].,;<>!&|";
-    private final ArrayList<String> KEYWORDS = new ArrayList<>(Arrays.asList("free", "final", "rec", "fun", "for", "while", "if", "else", "return"));
+    private final ArrayList<String> KEYWORDS = new ArrayList<>(Arrays.asList(
+            "free", "final", "rec", "fun", "for", "while", "if", "else", "return", "struct", "def", "break"));
     private static final ArrayList<String> BUILT_IN_FUNCTIONS = new ArrayList<>(Arrays.asList(
             "readInt", "readFloat", "readString", "writeInt", "writeFloat", "write", "writeln"
+    ));
+    private static final ArrayList<String> TYPES = new ArrayList<>(Arrays.asList(
+            "int", "float", "string", "bool", "free"
     ));
 
     public Lexer(Reader input) {
@@ -68,7 +72,7 @@ public class Lexer {
             return getNextSymbol();
         }
 
-        // Identifiers and keywords
+        // Identifiers, keywords
         if (Character.isLetter(currentChar) || currentChar == '_') {
             StringBuilder sb = new StringBuilder();
             while (Character.isLetterOrDigit(currentChar) || currentChar == '_') {
@@ -78,46 +82,17 @@ public class Lexer {
             String word = sb.toString();
 
             if (KEYWORDS.contains(word)) return new Symbol(SymbolType.KEYWORD, word);
+            if (TYPES.contains(word)) return new Symbol(SymbolType.TYPE, word);
             if (Arrays.asList(BOOLEAN_VALUES).contains(word)) return new Symbol(SymbolType.BOOLEAN, word);
-            if (BUILT_IN_FUNCTIONS.contains(word)) return new Symbol(SymbolType.KEYWORD, word);
-
-            if (currentChar == '(') {
-                advance();
-                return new Symbol(SymbolType.FUNCTION_CALL, word);
-            }
+            if (BUILT_IN_FUNCTIONS.contains(word)) return new Symbol(SymbolType.IDENTIFIER, word);
 
             if (Character.isUpperCase(word.charAt(0))) {
-                return new Symbol(SymbolType.USER_TYPE, word);
+                return new Symbol(SymbolType.REC, word);
             }
 
             return new Symbol(SymbolType.IDENTIFIER, word);
         }
 
-        // tab [].
-        if (currentChar == '[') {
-            advance();
-            Symbol index = getNextSymbol();  // get index
-
-            if (index.getType() != SymbolType.INTEGER) {
-                LexerError.reportError(line, column, '[');
-                return getNextSymbol();
-            }
-            if (currentChar == ']') {
-                advance();
-                if (currentChar == '.') {
-                    advance();
-                    StringBuilder field = new StringBuilder();
-                    while (Character.isLetterOrDigit(currentChar) || currentChar == '_') {
-                        field.append((char) currentChar);
-                        advance();
-                    }
-                    if (!field.isEmpty()) {
-                        return new Symbol(SymbolType.FIELD_OPERATOR, field.toString());
-                    }
-                }
-                return new Symbol(SymbolType.SYMBOL, "[]");
-            }
-        }
 
         // Field operator (.)
         if (currentChar == '.') {
@@ -130,6 +105,7 @@ public class Lexer {
             StringBuilder sb = new StringBuilder();
             boolean isFloat = false;
 
+            // .125
             if (currentChar == '.') {
                 if (!Character.isDigit(nextCharView())) {
                     LexerError.reportError(line, column, (char) currentChar);
@@ -137,21 +113,34 @@ public class Lexer {
                     return getNextSymbol();
                 }
                 sb.append('0');
+                sb.append((char) currentChar);
                 isFloat = true;
+                advance();
             }
 
-
-            while (Character.isDigit(currentChar) || currentChar == '.') {
-                if (currentChar == '.') {
-                    if (isFloat) break;
-                    isFloat = true;
-                }
+            while (Character.isDigit(currentChar)) {
                 sb.append((char) currentChar);
                 advance();
             }
 
-            if (sb.toString().endsWith(".")) sb.append("0");
+            // 1 more .
+            if (currentChar == '.') {
+                if (isFloat) {
+                    return new Symbol(SymbolType.FLOAT, sb.toString());
+                }
+                sb.append((char) currentChar); // Ajouter le point
+                isFloat = true;
+                advance();
+                while (Character.isDigit(currentChar)) {
+                    sb.append((char) currentChar);
+                    advance();
+                }
+            }
+            if (sb.toString().endsWith(".")) {
+                sb.append('0');
+            }
 
+            // Retourner le symbole approprié
             return new Symbol(isFloat ? SymbolType.FLOAT : SymbolType.INTEGER, sb.toString());
         }
 
@@ -193,7 +182,6 @@ public class Lexer {
                 sb.append((char) currentChar);
                 advance();
             }
-
             return new Symbol(SymbolType.SYMBOL, sb.toString());
         }
 

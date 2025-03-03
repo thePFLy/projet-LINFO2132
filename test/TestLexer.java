@@ -1,141 +1,213 @@
 import compiler.Lexer.Symbol;
 import compiler.Lexer.Lexer;
 import org.junit.Test;
-import java.io.BufferedReader;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.StringReader;
 import static org.junit.Assert.*;
 
 public class TestLexer {
 
-    @Test
-    public void testOperators() throws IOException {
-        String input = "-+/*";
-        StringReader reader = new StringReader(input);
-        Lexer lexer = new Lexer(reader);
+    private Lexer createTmpLexer(String input) {
+        return new Lexer(new StringReader(input));
+    }
 
-        assertEquals(Lexer.SymbolType.SYMBOL, lexer.getNextSymbol().getType());
-        assertEquals("-", lexer.getNextSymbol().getName());
-        assertEquals(Lexer.SymbolType.SYMBOL, lexer.getNextSymbol().getType());
-        assertEquals("+", lexer.getNextSymbol().getName());
-        assertEquals(Lexer.SymbolType.SYMBOL, lexer.getNextSymbol().getType());
-        assertEquals("/", lexer.getNextSymbol().getName());
-        assertEquals(Lexer.SymbolType.SYMBOL, lexer.getNextSymbol().getType());
-        assertEquals("*", lexer.getNextSymbol().getName());
+    private void assertSymbol(Lexer lexer, Lexer.SymbolType expectedType, String expectedName) throws IOException {
+        Symbol symbol = lexer.getNextSymbol();
+        assertEquals(expectedType, symbol.getType());
+        assertEquals(expectedName, symbol.getName());
     }
 
     @Test
-    public void testCp() throws IOException {
-        String input = "var x int = 2;";
-        StringReader reader = new StringReader(input);
-        Lexer lexer = new Lexer(reader);
-        int tokenCount = 0;
-
-        Symbol symbol;
-        while ((symbol = lexer.getNextSymbol()).getType() != Lexer.SymbolType.EOF) {
-            System.out.println("<Symbol: " + symbol.getType() + ", Lexeme: " + symbol.getName() + ">");
-            tokenCount++;
-        }
-
-        assertEquals(6, tokenCount); // var, x, int, =, 2, ;
+    public void testOperators() throws IOException {
+        Lexer lexer = createTmpLexer("-+");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, "-");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, "+");
     }
 
     @Test
     public void testNumber() throws IOException {
-        String input = "78915";
-        StringReader reader = new StringReader(input);
-        Lexer lexer = new Lexer(reader);
-        assertEquals(Lexer.SymbolType.INTEGER, lexer.getNextSymbol().getType());
+        Lexer lexer = createTmpLexer("78915");
+        assertSymbol(lexer, Lexer.SymbolType.INTEGER, "78915");
     }
 
     @Test
     public void testWhitespace() throws IOException {
-        String input = "var    x    =  2";
-        StringReader reader = new StringReader(input);
-        Lexer lexer = new Lexer(reader);
-
-        assertEquals(Lexer.SymbolType.IDENTIFIER, lexer.getNextSymbol().getType());
-        assertEquals("var", lexer.getNextSymbol().getName());
-        assertEquals(Lexer.SymbolType.IDENTIFIER, lexer.getNextSymbol().getType());
-        assertEquals("x", lexer.getNextSymbol().getName());
-        assertEquals(Lexer.SymbolType.SYMBOL, lexer.getNextSymbol().getType());
-        assertEquals("=", lexer.getNextSymbol().getName());
-        assertEquals(Lexer.SymbolType.INTEGER, lexer.getNextSymbol().getType());
-        assertEquals("2", lexer.getNextSymbol().getName());
+        Lexer lexer = createTmpLexer("var    x    =  2");
+        assertSymbol(lexer, Lexer.SymbolType.IDENTIFIER, "var");
+        assertSymbol(lexer, Lexer.SymbolType.IDENTIFIER, "x");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, "=");
+        assertSymbol(lexer, Lexer.SymbolType.INTEGER, "2");
     }
 
     @Test
     public void testComment() throws IOException {
-        String input = "$var x= 2\n int =";
-        StringReader reader = new StringReader(input);
-        Lexer lexer = new Lexer(reader);
-
-        assertEquals(Lexer.SymbolType.KEYWORD, lexer.getNextSymbol().getType());
-        assertEquals("int", lexer.getNextSymbol().getName());
-        assertEquals(Lexer.SymbolType.SYMBOL, lexer.getNextSymbol().getType());
-        assertEquals("=", lexer.getNextSymbol().getName());
+        Lexer lexer = createTmpLexer("$var x= 2\n int =");
+        assertSymbol(lexer, Lexer.SymbolType.TYPE, "int");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, "=");
     }
 
     @Test
     public void testIdentifier() throws IOException {
-        String input = "var_x2 = 10\n int =";
-        StringReader reader = new StringReader(input);
-        Lexer lexer = new Lexer(reader);
-
-        assertEquals(Lexer.SymbolType.IDENTIFIER, lexer.getNextSymbol().getType());
-        assertEquals("var_x2", lexer.getNextSymbol().getName());
-        assertEquals(Lexer.SymbolType.SYMBOL, lexer.getNextSymbol().getType());
-        assertEquals("=", lexer.getNextSymbol().getName());
-    }
-
-    @Test
-    public void testKeyWord() throws IOException {
-        String input = "final int x = 2\n int =";
-        StringReader reader = new StringReader(input);
-        Lexer lexer = new Lexer(reader);
-
-        assertEquals(Lexer.SymbolType.KEYWORD, lexer.getNextSymbol().getType());
-        assertEquals("final", lexer.getNextSymbol().getName());
-        assertEquals(Lexer.SymbolType.KEYWORD, lexer.getNextSymbol().getType());
-        assertEquals("int", lexer.getNextSymbol().getName());
-        assertEquals(Lexer.SymbolType.IDENTIFIER, lexer.getNextSymbol().getType());
-        assertEquals("x", lexer.getNextSymbol().getName());
-        assertEquals(Lexer.SymbolType.SYMBOL, lexer.getNextSymbol().getType());
-        assertEquals("=", lexer.getNextSymbol().getName());
+        Lexer lexer = createTmpLexer("var_x2 = 10\n int =");
+        assertSymbol(lexer, Lexer.SymbolType.IDENTIFIER, "var_x2");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, "=");
+        assertSymbol(lexer, Lexer.SymbolType.INTEGER, "10");
+        assertSymbol(lexer, Lexer.SymbolType.TYPE, "int");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, "=");
     }
 
     @Test
     public void testFloat() throws IOException {
-        String input = " x = 0.2345";
-        StringReader reader = new StringReader(input);
-        Lexer lexer = new Lexer(reader);
-        assertEquals(Lexer.SymbolType.IDENTIFIER, lexer.getNextSymbol().getType());
-        assertEquals("x", lexer.getNextSymbol().getName());
-        assertEquals(Lexer.SymbolType.SYMBOL, lexer.getNextSymbol().getType());
-        assertEquals("=", lexer.getNextSymbol().getName());
-        assertEquals(Lexer.SymbolType.FLOAT, lexer.getNextSymbol().getType());
-        assertEquals("0.2345", lexer.getNextSymbol().getName());
-    }
-
-    @Test
-    public void testExample() throws IOException {
-        try (BufferedReader reader = new BufferedReader(new FileReader("code_example2025.txt"))) {
-            Lexer lexer = new Lexer(reader);
-            assertEquals(Lexer.SymbolType.KEYWORD, lexer.getNextSymbol().getType());
-            assertEquals("final", lexer.getNextSymbol().getName());
-            assertEquals(Lexer.SymbolType.IDENTIFIER, lexer.getNextSymbol().getType());
-            assertEquals("message", lexer.getNextSymbol().getName());
-            assertEquals(Lexer.SymbolType.KEYWORD, lexer.getNextSymbol().getType());
-            assertEquals("rec", lexer.getNextSymbol().getName());
-        }
+        Lexer lexer = createTmpLexer(" x = 0.125.3");
+        assertSymbol(lexer, Lexer.SymbolType.IDENTIFIER, "x");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, "=");
+        assertSymbol(lexer, Lexer.SymbolType.FLOAT, "0.125");
     }
 
     @Test
     public void test() throws IOException {
-        String input = "var x int = 2;";
-        StringReader reader = new StringReader(input);
-        Lexer lexer = new Lexer(reader);
+        Lexer lexer = createTmpLexer("var x int = 2;");
         assertNotNull(lexer.getNextSymbol());
+    }
+
+    @Test
+    public void testPointCode() throws IOException {
+        Lexer lexer = createTmpLexer("Point rec { x int; y int; }");
+        assertSymbol(lexer, Lexer.SymbolType.REC, "Point");
+        assertSymbol(lexer, Lexer.SymbolType.KEYWORD, "rec");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, "{");
+        assertSymbol(lexer, Lexer.SymbolType.IDENTIFIER, "x");
+        assertSymbol(lexer, Lexer.SymbolType.TYPE, "int");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, ";");
+        assertSymbol(lexer, Lexer.SymbolType.IDENTIFIER, "y");
+        assertSymbol(lexer, Lexer.SymbolType.TYPE, "int");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, ";");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, "}");
+    }
+
+    @Test
+    public void testPersonCode() throws IOException {
+        Lexer lexer = createTmpLexer("Person rec { name string; location Point; history int[]; }");
+        assertSymbol(lexer, Lexer.SymbolType.REC, "Person");
+        assertSymbol(lexer, Lexer.SymbolType.KEYWORD, "rec");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, "{");
+        assertSymbol(lexer, Lexer.SymbolType.IDENTIFIER, "name");
+        assertSymbol(lexer, Lexer.SymbolType.TYPE, "string");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, ";");
+        assertSymbol(lexer, Lexer.SymbolType.IDENTIFIER, "location");
+        assertSymbol(lexer, Lexer.SymbolType.REC, "Point");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, ";");
+        assertSymbol(lexer, Lexer.SymbolType.IDENTIFIER, "history");
+        assertSymbol(lexer, Lexer.SymbolType.TYPE, "int");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, "[");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, "]");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, ";");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, "}");
+    }
+
+    @Test
+    public void testSquareCode() throws IOException {
+        Lexer lexer = createTmpLexer("fun square(int v) int { return v*v; }");
+        assertSymbol(lexer, Lexer.SymbolType.KEYWORD, "fun");
+        assertSymbol(lexer, Lexer.SymbolType.IDENTIFIER, "square");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, "(");
+        assertSymbol(lexer, Lexer.SymbolType.TYPE, "int");
+        assertSymbol(lexer, Lexer.SymbolType.IDENTIFIER, "v");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, ")");
+        assertSymbol(lexer, Lexer.SymbolType.TYPE, "int");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, "{");
+        assertSymbol(lexer, Lexer.SymbolType.KEYWORD, "return");
+        assertSymbol(lexer, Lexer.SymbolType.IDENTIFIER, "v");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, "*");
+        assertSymbol(lexer, Lexer.SymbolType.IDENTIFIER, "v");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, ";");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, "}");
+    }
+
+    @Test
+    public void testCopyCode() throws IOException {
+        Lexer lexer = createTmpLexer("fun copyPoints(Point[] p) Point { return Point(p[0].x+p[1].x, p[0].y+p[1].y); }");
+        assertSymbol(lexer, Lexer.SymbolType.KEYWORD, "fun");
+        assertSymbol(lexer, Lexer.SymbolType.IDENTIFIER, "copyPoints");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, "(");
+        assertSymbol(lexer, Lexer.SymbolType.REC, "Point");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, "[");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, "]");
+        assertSymbol(lexer, Lexer.SymbolType.IDENTIFIER, "p");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, ")");
+        assertSymbol(lexer, Lexer.SymbolType.REC, "Point");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, "{");
+        assertSymbol(lexer, Lexer.SymbolType.KEYWORD, "return");
+        assertSymbol(lexer, Lexer.SymbolType.REC, "Point");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, "(");
+        assertSymbol(lexer, Lexer.SymbolType.IDENTIFIER, "p");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, "[");
+        assertSymbol(lexer, Lexer.SymbolType.INTEGER, "0");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, "]");
+        assertSymbol(lexer, Lexer.SymbolType.FIELD_OPERATOR, ".");
+        assertSymbol(lexer, Lexer.SymbolType.IDENTIFIER, "x");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, "+");
+        assertSymbol(lexer, Lexer.SymbolType.IDENTIFIER, "p");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, "[");
+        assertSymbol(lexer, Lexer.SymbolType.INTEGER, "1");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, "]");
+        assertSymbol(lexer, Lexer.SymbolType.FIELD_OPERATOR, ".");
+        assertSymbol(lexer, Lexer.SymbolType.IDENTIFIER, "x");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, ",");
+        assertSymbol(lexer, Lexer.SymbolType.IDENTIFIER, "p");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, "[");
+        assertSymbol(lexer, Lexer.SymbolType.INTEGER, "0");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, "]");
+        assertSymbol(lexer, Lexer.SymbolType.FIELD_OPERATOR, ".");
+        assertSymbol(lexer, Lexer.SymbolType.IDENTIFIER, "y");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, "+");
+        assertSymbol(lexer, Lexer.SymbolType.IDENTIFIER, "p");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, "[");
+        assertSymbol(lexer, Lexer.SymbolType.INTEGER, "1");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, "]");
+        assertSymbol(lexer, Lexer.SymbolType.FIELD_OPERATOR, ".");
+        assertSymbol(lexer, Lexer.SymbolType.IDENTIFIER, "y");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, ")");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, ";");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, "}");
+    }
+
+    @Test
+    public void testMainCode() throws IOException {
+        Lexer lexer = createTmpLexer("fun main() {\n" +
+                "    value int = readInt();\n" +
+                "    writeln(square(value));\n" +
+                "    i int;\n" +
+                "    for (i, 1, 100, 1) {\n" +
+                "        while (value != 3) {\n" +
+                "            if (i > 10) {\n" +
+                "                $ ....\n" +
+                "            } else {\n" +
+                "                $ ....\n" +
+                "            }\n" +
+                "        }\n" +
+                "    }\n" +
+                "    i = (i + 2) * 2;\n" +
+                "}");
+        assertSymbol(lexer, Lexer.SymbolType.KEYWORD, "fun");
+        assertSymbol(lexer, Lexer.SymbolType.IDENTIFIER, "main");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, "(");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, ")");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, "{");
+        assertSymbol(lexer, Lexer.SymbolType.IDENTIFIER, "value");
+        assertSymbol(lexer, Lexer.SymbolType.TYPE, "int");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, "=");
+        assertSymbol(lexer, Lexer.SymbolType.IDENTIFIER, "readInt");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, "(");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, ")");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, ";");
+        assertSymbol(lexer, Lexer.SymbolType.IDENTIFIER, "writeln");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, "(");
+        assertSymbol(lexer, Lexer.SymbolType.IDENTIFIER, "square");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, "(");
+        assertSymbol(lexer, Lexer.SymbolType.IDENTIFIER, "value");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, ")");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, ")");
+        assertSymbol(lexer, Lexer.SymbolType.SYMBOL, ";");
     }
 }
