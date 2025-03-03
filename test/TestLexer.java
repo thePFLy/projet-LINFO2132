@@ -32,7 +32,7 @@ public class TestLexer {
 
     @Test
     public void testWhitespace() throws IOException {
-        Lexer lexer = createTmpLexer("var    x    =  2");
+        Lexer lexer = createTmpLexer("var  x    =  2");
         assertSymbol(lexer, Lexer.SymbolType.IDENTIFIER, "var");
         assertSymbol(lexer, Lexer.SymbolType.IDENTIFIER, "x");
         assertSymbol(lexer, Lexer.SymbolType.SYMBOL, "=");
