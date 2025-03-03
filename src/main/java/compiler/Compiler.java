@@ -8,11 +8,11 @@ import java.io.IOException;
 
 public class Compiler {
     public static void main(String[] args) throws IOException {
-        if (args.length != 1) {
-            System.out.println("Need one argument");
+        if (args.length != 2 || !args[0].equals("-lexer")) {
+            System.out.println("need: -lexer <file>");
             return;
         }
-        String file = args[0];
+        String file = args[1];
         // file reading
         Reader reader = new FileReader(file);
         // lexer file
