@@ -140,7 +140,6 @@ public class Lexer {
                 sb.append('0');
             }
 
-            // Retourner le symbole approprié
             return new Symbol(isFloat ? SymbolType.FLOAT : SymbolType.INTEGER, sb.toString());
         }
 
