@@ -57,6 +57,10 @@ public class Lexer {
         }
     }
 
+    public int getLine() {
+        return line;
+    }
+
     public Symbol getNextSymbol() {
         skipWhitespace();
 
