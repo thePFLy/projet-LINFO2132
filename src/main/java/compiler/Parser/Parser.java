@@ -130,184 +130,35 @@ public class Parser {
         return new VariableDeclaration(identifier, type, initializer);
     }
 
-    public ASTree parseIfStatement() throws ParserException {
-        match(Lexer.SymbolType.KEYWORD); // "if"
-        match(Lexer.SymbolType.SYMBOL); // "("
-        ASTree condition = parseExpression();
-        match(Lexer.SymbolType.SYMBOL); // ")"
-        ASTree ifBlock = parseBlock();
-        ASTree elseBlock = null;
-        if (lookahead.getType() == Lexer.SymbolType.KEYWORD && lookahead.getName().equals("else")) {
-            match(Lexer.SymbolType.KEYWORD); // "else"
-            elseBlock = parseBlock();
-        }
-        return new IfStatement(condition, ifBlock, elseBlock);
-    }
-
     private ASTree parseBlock() throws ParserException {
         match(Lexer.SymbolType.SYMBOL); // "{"
-        ASTree block = parseExpression(); // 1 statement
+        System.out.println("Matched '{' and starting to parse block...");
+        List<ASTree> statements = new ArrayList<>();
+        while (lookahead.getType() != Lexer.SymbolType.SYMBOL || !lookahead.getName().equals("}")) {
+            statements.add(parseExpression()); // Or use parseStatement() if you have a dedicated method for statements
+        }
         match(Lexer.SymbolType.SYMBOL); // "}"
-        return block;
+        return new Block(statements);
     }
 
-    private static class IfStatement extends ASTree {
-        private final ASTree condition;
-        private final ASTree ifBlock;
-        private final ASTree elseBlock;
+    private static class Block extends ASTree {
+        private final List<ASTree> statements;
 
-        public IfStatement(ASTree condition, ASTree ifBlock, ASTree elseBlock) {
-            this.condition = condition;
-            this.ifBlock = ifBlock;
-            this.elseBlock = elseBlock;
+        public Block(List<ASTree> statements) {
+            this.statements = statements;
         }
 
         @Override
         public String toString() {
-            return "IfStatement";
+            return "Block";
         }
 
         @Override
         public void printTree(int level) {
             super.printTree(level);
-            condition.printTree(level + 1);
-            ifBlock.printTree(level + 1);
-            if (elseBlock != null) elseBlock.printTree(level + 1);
-        }
-    }
-
-    public ASTree parseWhileLoop() throws ParserException {
-        match(Lexer.SymbolType.KEYWORD); // "while"
-        match(Lexer.SymbolType.SYMBOL); // "("
-        ASTree condition = parseExpression();
-        match(Lexer.SymbolType.SYMBOL); // ")"
-        ASTree body = parseBlock();
-        return new WhileLoop(condition, body);
-    }
-
-    private static class WhileLoop extends ASTree {
-        private final ASTree condition;
-        private final ASTree body;
-
-        public WhileLoop(ASTree condition, ASTree body) {
-            this.condition = condition;
-            this.body = body;
-        }
-
-        @Override
-        public String toString() {
-            return "WhileLoop";
-        }
-
-        @Override
-        public void printTree(int level) {
-            super.printTree(level);
-            condition.printTree(level + 1);
-            body.printTree(level + 1);
-        }
-    }
-
-    public ASTree parseArrayDeclaration() throws ParserException {
-        Symbol identifierSymbol = lookahead;
-        match(Lexer.SymbolType.IDENTIFIER);
-        Identifier identifier = new Identifier(identifierSymbol.getName());
-
-        Symbol typeSymbol = lookahead;
-        match(Lexer.SymbolType.TYPE);
-        Type type = new Type(typeSymbol.getName());
-
-        match(Lexer.SymbolType.SYMBOL); // "["
-        match(Lexer.SymbolType.SYMBOL); // "]"
-        match(Lexer.SymbolType.SYMBOL); // "="
-        match(Lexer.SymbolType.KEYWORD); // "array"
-        match(Lexer.SymbolType.SYMBOL); // "["
-        ASTree size = parseExpression();
-        match(Lexer.SymbolType.SYMBOL); // "]"
-        match(Lexer.SymbolType.KEYWORD); // "of"
-        match(Lexer.SymbolType.TYPE); // type
-
-        return new ArrayDeclaration(identifier, type, size);
-    }
-
-    private static class ArrayDeclaration extends ASTree {
-        private final Identifier identifier;
-        private final Type type;
-        private final ASTree size;
-
-        public ArrayDeclaration(Identifier identifier, Type type, ASTree size) {
-            this.identifier = identifier;
-            this.type = type;
-            this.size = size;
-        }
-
-        @Override
-        public String toString() {
-            return "ArrayDeclaration";
-        }
-
-        @Override
-        public void printTree(int level) {
-            super.printTree(level);
-            identifier.printTree(level + 1);
-            type.printTree(level + 1);
-            size.printTree(level + 1);
-        }
-    }
-
-    public ASTree parseFunctionDeclaration() throws ParserException {
-        match(Lexer.SymbolType.KEYWORD); // "fun"
-        Symbol nameSymbol = lookahead;
-        match(Lexer.SymbolType.IDENTIFIER);
-        Identifier name = new Identifier(nameSymbol.getName());
-
-        match(Lexer.SymbolType.SYMBOL); // "("
-        List<ASTree> parameters = parseParameters();
-        match(Lexer.SymbolType.SYMBOL); // ")"
-
-        Symbol returnTypeSymbol = lookahead;
-        match(Lexer.SymbolType.TYPE);
-        Type returnType = new Type(returnTypeSymbol.getName());
-
-        ASTree body = parseBlock();
-        return new FunctionDeclaration(name, parameters, returnType, body);
-    }
-
-    private List<ASTree> parseParameters() throws ParserException {
-        List<ASTree> parameters = new ArrayList<>();
-        while (lookahead.getType() != Lexer.SymbolType.SYMBOL || !lookahead.getName().equals(")")) {
-            parameters.add(parseVariableDeclaration());
-            if (lookahead.getType() == Lexer.SymbolType.SYMBOL && lookahead.getName().equals(",")) {
-                match(Lexer.SymbolType.SYMBOL); // ","
+            for (ASTree statement : statements) {
+                statement.printTree(level + 1);
             }
-        }
-        return parameters;
-    }
-
-    private static class FunctionDeclaration extends ASTree {
-        private final Identifier name;
-        private final List<ASTree> parameters;
-        private final Type returnType;
-        private final ASTree body;
-
-        public FunctionDeclaration(Identifier name, List<ASTree> parameters, Type returnType, ASTree body) {
-            this.name = name;
-            this.parameters = parameters;
-            this.returnType = returnType;
-            this.body = body;
-        }
-
-        @Override
-        public String toString() {
-            return "FunctionDeclaration";
-        }
-
-        @Override
-        public void printTree(int level) {
-            super.printTree(level);
-            name.printTree(level + 1);
-            for (ASTree param : parameters) param.printTree(level + 1);
-            returnType.printTree(level + 1);
-            body.printTree(level + 1);
         }
     }
 }
