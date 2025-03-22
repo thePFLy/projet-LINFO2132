@@ -7,7 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Parser {
-    private Lexer lexer;
+    private final Lexer lexer;
     private Symbol lookahead;
 
     public Parser(Lexer lexer) {
@@ -62,15 +62,15 @@ public class Parser {
             case FLOAT:
                 Symbol floatSymbol = lookahead;
                 match(Lexer.SymbolType.FLOAT);
-                return new Literal(floatSymbol.getName()); // Réutilisez Literal
+                return new Literal(floatSymbol.getName()); //Literal
             case STRING:
                 Symbol stringSymbol = lookahead;
                 match(Lexer.SymbolType.STRING);
-                return new Literal(stringSymbol.getName()); // Réutilisez Literal
+                return new Literal(stringSymbol.getName()); //Literal
             case BOOLEAN:
                 Symbol booleanSymbol = lookahead;
                 match(Lexer.SymbolType.BOOLEAN);
-                return new Literal(booleanSymbol.getName()); // Réutilisez Literal
+                return new Literal(booleanSymbol.getName()); //Literal
             case IDENTIFIER:
                 Symbol identifier = lookahead;
                 match(Lexer.SymbolType.IDENTIFIER);
@@ -87,10 +87,10 @@ public class Parser {
         }
     }
 
-    private class VariableDeclaration extends ASTree {
-        private Identifier identifier;
-        private Type type;
-        private ASTree initializer;
+    private static class VariableDeclaration extends ASTree {
+        private final Identifier identifier;
+        private final Type type;
+        private final ASTree initializer;
 
         public VariableDeclaration(Identifier identifier, Type type, ASTree initializer) {
             this.identifier = identifier;
@@ -151,8 +151,10 @@ public class Parser {
         return block;
     }
 
-    private class IfStatement extends ASTree {
-        private ASTree condition, ifBlock, elseBlock;
+    private static class IfStatement extends ASTree {
+        private final ASTree condition;
+        private final ASTree ifBlock;
+        private final ASTree elseBlock;
 
         public IfStatement(ASTree condition, ASTree ifBlock, ASTree elseBlock) {
             this.condition = condition;
@@ -183,8 +185,9 @@ public class Parser {
         return new WhileLoop(condition, body);
     }
 
-    private class WhileLoop extends ASTree {
-        private ASTree condition, body;
+    private static class WhileLoop extends ASTree {
+        private final ASTree condition;
+        private final ASTree body;
 
         public WhileLoop(ASTree condition, ASTree body) {
             this.condition = condition;
@@ -226,10 +229,10 @@ public class Parser {
         return new ArrayDeclaration(identifier, type, size);
     }
 
-    private class ArrayDeclaration extends ASTree {
-        private Identifier identifier;
-        private Type type;
-        private ASTree size;
+    private static class ArrayDeclaration extends ASTree {
+        private final Identifier identifier;
+        private final Type type;
+        private final ASTree size;
 
         public ArrayDeclaration(Identifier identifier, Type type, ASTree size) {
             this.identifier = identifier;
@@ -280,11 +283,11 @@ public class Parser {
         return parameters;
     }
 
-    private class FunctionDeclaration extends ASTree {
-        private Identifier name;
-        private List<ASTree> parameters;
-        private Type returnType;
-        private ASTree body;
+    private static class FunctionDeclaration extends ASTree {
+        private final Identifier name;
+        private final List<ASTree> parameters;
+        private final Type returnType;
+        private final ASTree body;
 
         public FunctionDeclaration(Identifier name, List<ASTree> parameters, Type returnType, ASTree body) {
             this.name = name;
