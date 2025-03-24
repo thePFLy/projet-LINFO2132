@@ -1,7 +1,7 @@
-package compiler.Parser;
-
 import compiler.Lexer.Lexer;
 import compiler.Parser.AST.ProgramNode;
+import compiler.Parser.Parser;
+import compiler.Parser.ParserException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
