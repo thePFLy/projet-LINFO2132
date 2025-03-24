@@ -141,21 +141,22 @@ public class Parser {
     private List<Parameter> parseParameterList() throws ParserException {
         List<Parameter> parameters = new ArrayList<>();
         while (!check(")")) {
-            if (checkType(Lexer.SymbolType.IDENTIFIER) && nextToken.getType() == Lexer.SymbolType.TYPE) {
-                String name = currentToken.getName();
+            boolean isNameFirst = checkType(Lexer.SymbolType.IDENTIFIER)
+                    && nextToken.getType() == Lexer.SymbolType.TYPE;
+
+            String name = isNameFirst ? currentToken.getName() : null;
+            if (isNameFirst) match(name);
+
+            Type type = parseType();
+
+            if (!isNameFirst) {
+                name = currentToken.getName();
                 match(name);
-                Type type = parseType();
-                parameters.add(new Parameter(name, type));
-            } else {
-                Type type = parseType();
-                String name = currentToken.getName();
-                match(name);
-                parameters.add(new Parameter(name, type));
             }
 
-            if (!check(")")) {
-                match(",");
-            }
+            parameters.add(new Parameter(name, type));
+
+            if (!check(")")) match(",");
         }
         return parameters;
     }
@@ -450,7 +451,6 @@ public class Parser {
     }
 
     private Type parseType() throws ParserException {
-
         if (check("array")) {
             match("array");
             match("[");
@@ -458,16 +458,26 @@ public class Parser {
             Type elementType = parseType();
             return new ArrayType(elementType, 1);
         }
+
         String typeName = currentToken.getName();
         match(typeName);
 
         if (check("[")) {
             match("[");
             match("]");
-            return new ArrayType(PrimitiveType.fromString(typeName), 1);
+            Type elementType = getTypeByName(typeName);
+            return new ArrayType(elementType, 1);
         }
 
-        return PrimitiveType.fromString(typeName);
+        return getTypeByName(typeName);
+    }
+
+    private Type getTypeByName(String typeName) throws ParserException {
+        try {
+            return PrimitiveType.fromString(typeName);
+        } catch (IllegalArgumentException e) {
+            return new RecordType(typeName);
+        }
     }
 
     // Utility methods

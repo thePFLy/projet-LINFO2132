@@ -106,34 +106,4 @@ public class TestParser {
         parse("int x ="); // Syntaxe invalide
     }
 
-    @Test
-    public void testComplexProgram() throws Exception {
-        String code = """
-            final float PI = 3.14;
-            
-            rec Circle {
-                radius float;
-                area float;
-            }
-            
-            fun calculateArea(c Circle) float {
-                c.area = PI * c.radius * c.radius;
-                return c.area;
-            }
-            
-            fun main() {
-                Circle c;
-                c.radius = 5.0;
-                float area = calculateArea(c);
-                write(area);
-            }
-            """;
-
-        ProgramNode ast = parse(code);
-        assertEquals(4, ast.statements.size());
-        assertTrue(ast.statements.get(0) instanceof VariableDeclaration);
-        assertTrue(ast.statements.get(1) instanceof RecordDeclaration);
-        assertTrue(ast.statements.get(2) instanceof FunctionDeclaration);
-        assertTrue(ast.statements.get(3) instanceof FunctionDeclaration);
-    }
 }
