@@ -1,265 +1,446 @@
 package compiler.Parser;
 
-import compiler.Lexer.Lexer;
-import compiler.Lexer.Symbol;
+import compiler.Lexer.*;
+import compiler.Parser.AST.*;
+import compiler.Parser.AST.Declarations.*;
+import compiler.Parser.AST.Expressions.*;
+import compiler.Parser.AST.Statements.*;
+import compiler.Parser.AST.Types.*;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class Parser {
+    private Symbol currentToken;
+    private Symbol nextToken;
+    private Symbol nextNextToken;
     private final Lexer lexer;
-    private Symbol lookahead;
 
     public Parser(Lexer lexer) {
         this.lexer = lexer;
-        //first token
-        this.lookahead = lexer.getNextSymbol();
+        advance(); // first token
+        advance(); // nextToken
+        advance(); // nextNextToken
     }
 
-    //go to next token/verify it
-    private void match(Lexer.SymbolType expectedType) throws ParserException {
-        if (lookahead.getType() != expectedType) {
-            throw new ParserException("Unexpected token", lexer.getLine(), lookahead.getName());
-        }
-        lookahead = lexer.getNextSymbol();
+    public ProgramNode getAST() throws ParserException {
+        return parseProgram();
     }
 
-    public ASTree parseExpression() throws ParserException {
-        return parseAdditiveExpression();
+    public ProgramNode parseProgram() throws ParserException {
+        List<ASTNode> statements = new ArrayList<>();
+        while (!checkType(Lexer.SymbolType.EOF)) {
+            statements.add(parseStatement());
+        }
+        return new ProgramNode(statements);
     }
 
-    // "+", "-")
-    private ASTree parseAdditiveExpression() throws ParserException {
-        ASTree left = parseMultiplicativeExpression();
-        while (lookahead.getType() == Lexer.SymbolType.SYMBOL && (lookahead.getName().equals("+") || lookahead.getName().equals("-"))) {
-            String operator = lookahead.getName();
-            match(Lexer.SymbolType.SYMBOL);
-            ASTree right = parseMultiplicativeExpression();
-            left = new BinaryExpression(left, operator, right);
-        }
-        return left;
-    }
+    private ASTNode parseStatement() throws ParserException {
+        skipSemicolons();
 
-    // "*", "/"
-    private ASTree parseMultiplicativeExpression() throws ParserException {
-        ASTree left = parsePrimaryExpression();
-        while (lookahead.getType() == Lexer.SymbolType.SYMBOL && (lookahead.getName().equals("*") || lookahead.getName().equals("/"))) {
-            String operator = lookahead.getName();
-            match(Lexer.SymbolType.SYMBOL);
-            ASTree right = parsePrimaryExpression();
-            left = new BinaryExpression(left, operator, right);
-        }
-        return left;
-    }
-
-    //basic elements
-    private ASTree parsePrimaryExpression() throws ParserException {
-        switch (lookahead.getType()) {
-            case INTEGER:
-                Symbol integer = lookahead;
-                match(Lexer.SymbolType.INTEGER);
-                return new Literal(integer.getName());
-            case FLOAT:
-                Symbol floatSymbol = lookahead;
-                match(Lexer.SymbolType.FLOAT);
-                return new Literal(floatSymbol.getName()); //Literal
-            case STRING:
-                Symbol stringSymbol = lookahead;
-                match(Lexer.SymbolType.STRING);
-                return new Literal(stringSymbol.getName()); //Literal
-            case BOOLEAN:
-                Symbol booleanSymbol = lookahead;
-                match(Lexer.SymbolType.BOOLEAN);
-                return new Literal(booleanSymbol.getName()); //Literal
-            case IDENTIFIER:
-                Symbol identifier = lookahead;
-                match(Lexer.SymbolType.IDENTIFIER);
-                return new Identifier(identifier.getName());
-            case SYMBOL:
-                if (lookahead.getName().equals("(")) {
-                    match(Lexer.SymbolType.SYMBOL); // "("
-                    ASTree expr = parseExpression();
-                    match(Lexer.SymbolType.SYMBOL); // ")"
-                    return expr;
-                }
-            default:
-                throw new ParserException("Unexpected token", lexer.getLine(), lookahead.getName());
-        }
-    }
-
-    private static class VariableDeclaration extends ASTree {
-        private final Identifier identifier;
-        private final Type type;
-        private final ASTree initializer;
-
-        public VariableDeclaration(Identifier identifier, Type type, ASTree initializer) {
-            this.identifier = identifier;
-            this.type = type;
-            this.initializer = initializer;
-        }
-
-        @Override
-        public String toString() {
-            return "VariableDeclaration";
-        }
-
-        @Override
-        public void printTree(int level) {
-            super.printTree(level);
-            identifier.printTree(level + 1);
-            type.printTree(level + 1);
-            if (initializer != null) {
-                initializer.printTree(level + 1);
+        if (checkType(Lexer.SymbolType.KEYWORD)) {
+            switch (currentToken.getName()) {
+                case "final": return parseFinalDeclaration();
+                case "rec": return parseRecordDefinition();
+                case "fun": return parseFunctionDefinition();
+                case "if": return parseIfStatement();
+                case "for": return parseForLoop();
+                case "while": return parseWhileLoop();
+                case "return": return parseReturnStatement();
+                case "break":
+                    advance();
+                    match(";");
+                    return new BreakStatement();
             }
         }
-    }
 
-    public ASTree parseVariableDeclaration() throws ParserException {
-        Symbol identifierSymbol = lookahead;
-        match(Lexer.SymbolType.IDENTIFIER);
-        Identifier identifier = new Identifier(identifierSymbol.getName());
-
-        Symbol typeSymbol = lookahead;
-        match(Lexer.SymbolType.TYPE);
-        Type type = new Type(typeSymbol.getName());
-
-        match(Lexer.SymbolType.SYMBOL);
-        ASTree initializer = parseExpression();
-        match(Lexer.SymbolType.SYMBOL);
-
-        return new VariableDeclaration(identifier, type, initializer);
-    }
-
-
-    private ASTree parseBlock() throws ParserException {
-        match(Lexer.SymbolType.SYMBOL); // "{"
-        System.out.println("Matched '{' and starting to parse block...");
-        List<ASTree> statements = new ArrayList<>();
-        while (lookahead.getType() != Lexer.SymbolType.SYMBOL || !lookahead.getName().equals("}")) {
-            statements.add(parseExpression()); // Or use parseStatement() if you have a dedicated method for statements
+        if (checkType(Lexer.SymbolType.IDENTIFIER)) {
+            switch (nextToken.getName()) {
+                case "=":
+                    return parseAssignment();
+                case "(":
+                    return parseFunctionCall();
+                case "[":
+                    return parseArrayAssignment();
+                case ".":
+                    return parseFieldAssignment();
+            }
         }
-        match(Lexer.SymbolType.SYMBOL); // "}"
-        return new Block(statements);
+
+        throw new ParserException(
+                "Invalid statement: " + currentToken.getName(),
+                lexer.getLine(),
+                currentToken.getName()
+        );
     }
-    private ASTree parseLeftAssignment() throws ParserException {
-        while(!lookahead.getName().equals("=")){
-            
+
+    // Declaration parsing
+    private VariableDeclaration parseFinalDeclaration() throws ParserException {
+        match("final");
+        Type type = parseType();
+        String identifier = currentToken.getName();
+        match(identifier);
+        ASTNode initialValue = null;
+        if (check("=")) {
+            match("=");
+            initialValue = parseExpression();
         }
+        match(";");
+        return new VariableDeclaration(type, identifier, true, initialValue);
     }
-    private ASTree parseRightAssignment() throws ParserException {
 
+    private RecordDeclaration parseRecordDefinition() throws ParserException {
+        match("rec");
+        String name = currentToken.getName();
+        match(name);
+        match("{");
+        List<FieldDeclaration> fields = new ArrayList<>();
+        while (!check("}")) {
+            Type fieldType = parseType();
+            String fieldName = currentToken.getName();
+            match(fieldName);
+            fields.add(new FieldDeclaration(fieldName, fieldType));
+            match(";");
+        }
+        match("}");
+        return new RecordDeclaration(name, fields);
     }
-    private ASTree parseAssignment() throws ParserException{
-        ASTree left = parseLeftAssignment();
-        match(Lexer.SymbolType.SYMBOL); // =
-        ASTree right = parseRightAssignment();
-        return new Assignment(left, right);
 
+    private FunctionDeclaration parseFunctionDefinition() throws ParserException {
+        match("fun");
+        String name = currentToken.getName();
+        match(name);
+        match("(");
+        List<Parameter> parameters = parseParameterList();
+        match(")");
+        Type returnType = null;
+        if (checkType(Lexer.SymbolType.TYPE)) {
+            returnType = parseType();
+        }
+        BlockStatement body = parseBlock();
+        return new FunctionDeclaration(name, parameters, returnType, body);
     }
-    // Parses if-else statements
-    private ASTree parseIfStatement() throws ParserException {
-        match(Lexer.SymbolType.KEYWORD); // "if"
-        match(Lexer.SymbolType.SYMBOL);  // "("
-        ASTree condition = parseExpression();
-        match(Lexer.SymbolType.SYMBOL);  // ")"
-        ASTree ifBlock = parseBlock();
-        ASTree elseBlock = null;
-        if (lookahead.getType() == Lexer.SymbolType.KEYWORD && lookahead.getName().equals("else")) {
-            match(Lexer.SymbolType.KEYWORD);
+
+    private List<Parameter> parseParameterList() throws ParserException {
+        List<Parameter> parameters = new ArrayList<>();
+        while (!check(")")) {
+            Type type = parseType();
+            String name = currentToken.getName();
+            match(name);
+            parameters.add(new Parameter(name, type));
+            if (!check(")")) {
+                match(",");
+            }
+        }
+        return parameters;
+    }
+
+    // Statement parsing
+    private IfStatement parseIfStatement() throws ParserException {
+        match("if");
+        match("(");
+        ASTNode condition = parseExpression();
+        match(")");
+        BlockStatement thenBlock = parseBlock();
+        BlockStatement elseBlock = null;
+        if (check("else")) {
+            match("else");
             elseBlock = parseBlock();
         }
-        return new IfStatement(condition, ifBlock, elseBlock);
+        return new IfStatement(condition, thenBlock, elseBlock);
     }
 
-    // Parses while loops
-    private ASTree parseWhileLoop() throws ParserException {
-        match(Lexer.SymbolType.KEYWORD); // "while"
-        match(Lexer.SymbolType.SYMBOL);  // "("
-        ASTree condition = parseExpression();
-        match(Lexer.SymbolType.SYMBOL);  // ")"
-        ASTree body = parseBlock();
+    private ForLoop parseForLoop() throws ParserException {
+        match("for");
+        match("(");
+        ASTNode init = check(";") ? null : parseForInit();
+        match(";");
+        ASTNode condition = check(";") ? null : parseExpression();
+        match(";");
+        ASTNode update = check(")") ? null : parseExpression();
+        match(")");
+        BlockStatement body = parseBlock();
+        return new ForLoop(init, condition, update, body);
+    }
+
+    private ASTNode parseForInit() throws ParserException {
+        if (checkType(Lexer.SymbolType.KEYWORD) && currentToken.getName().equals("final")) {
+            return parseFinalDeclaration();
+        } else if (checkType(Lexer.SymbolType.TYPE)) {
+            return parseVariableDeclaration();
+        } else {
+            return parseExpression();
+        }
+    }
+
+    private VariableDeclaration parseVariableDeclaration() throws ParserException {
+        Type type = parseType();
+        String identifier = currentToken.getName();
+        match(identifier);
+        ASTNode initialValue = null;
+        if (check("=")) {
+            match("=");
+            initialValue = parseExpression();
+        }
+        match(";");
+        return new VariableDeclaration(type, identifier, false, initialValue);
+    }
+
+    private WhileLoop parseWhileLoop() throws ParserException {
+        match("while");
+        match("(");
+        ASTNode condition = parseExpression();
+        match(")");
+        BlockStatement body = parseBlock();
         return new WhileLoop(condition, body);
     }
-    // Parses for loops
-    private ASTree parseForLoop() throws ParserException {
-        match(Lexer.SymbolType.KEYWORD); // "for"
-        match(Lexer.SymbolType.SYMBOL);  // "("
-        ASTree initialization = parseAssignment();
-        ASTree condition = parseExpression();
-        match(Lexer.SymbolType.SYMBOL); // ";"
-        ASTree update = parseExpression();
-        match(Lexer.SymbolType.SYMBOL); // ")"
-        ASTree body = parseBlock();
-        return new ForLoop(initialization, condition, update, body);
+
+    private ReturnStatement parseReturnStatement() throws ParserException {
+        match("return");
+        ASTNode expr = check(";") ? null : parseExpression();
+        match(";");
+        return new ReturnStatement(expr);
     }
 
-    private ASTree parseAssignment() {
-        return null;
+    // Expression parsing
+    private Assignment parseAssignment() throws ParserException {
+        String identifier = currentToken.getName();
+        match(identifier);
+        match("=");
+        ASTNode value = parseExpression();
+        match(";");
+        return new Assignment(new Identifier(identifier), value);
     }
 
-    // Parses function calls
-    private ASTree parseFunctionCall(Identifier functionName) throws ParserException {
-        match(Lexer.SymbolType.SYMBOL); // "("
-        List<ASTree> arguments = new ArrayList<>();
-        while (lookahead.getType() != Lexer.SymbolType.SYMBOL || !lookahead.getValue().equals(")")) {
-            arguments.add(parseExpression());
-            if (lookahead.getName().equals(",")) {
-                match(Lexer.SymbolType.SYMBOL);
-            } else {
-                break;
+    private Assignment parseArrayAssignment() throws ParserException {
+        String identifier = currentToken.getName();
+        match(identifier);
+        match("[");
+        ASTNode index = parseExpression();
+        match("]");
+        match("=");
+        ASTNode value = parseExpression();
+        match(";");
+        return new Assignment(new ArrayAccess(new Identifier(identifier), index), value);
+    }
+
+    private Assignment parseFieldAssignment() throws ParserException {
+        String recordName = currentToken.getName();
+        match(recordName);
+        match(".");
+        String fieldName = currentToken.getName();
+        match(fieldName);
+        match("=");
+        ASTNode value = parseExpression();
+        match(";");
+        return new Assignment(new FieldAccess(new Identifier(recordName), fieldName), value);
+    }
+
+    private FunctionCall parseFunctionCall() throws ParserException {
+        String name = currentToken.getName();
+        match(name);
+        match("(");
+        List<ASTNode> args = new ArrayList<>();
+        while (!check(")")) {
+            args.add(parseExpression());
+            if (!check(")")) {
+                match(",");
             }
         }
-        match(Lexer.SymbolType.SYMBOL); // ")"
-        return new FunctionCall(functionName, arguments);
+        match(")");
+        match(";");
+        return new FunctionCall(name, args);
     }
 
-    // Parses methods
-    private ASTree parseMethod() throws ParserException {
-        match(Lexer.SymbolType.KEYWORD); // "fun"
-        Symbol functionName = lookahead;
-        match(Lexer.SymbolType.IDENTIFIER);
-        match(Lexer.SymbolType.SYMBOL); // "("
-        List<Parameter> parameters = new ArrayList<>();
-        parseParams(parameters);
-        match(Lexer.SymbolType.SYMBOL); // ")"
-        ASTree body = parseBlock();
-        return new FunctionDeclaration(new Identifier(functionName.getName()), parameters, body);
+    private ASTNode parseExpression() throws ParserException {
+        return parseAssignmentExpression();
     }
 
-    private void parseParams(List<Parameter> parameters) throws ParserException {
-        while (lookahead.getType() == Lexer.SymbolType.IDENTIFIER) {
-            Symbol paramName = lookahead;
-            match(Lexer.SymbolType.IDENTIFIER);
-            Symbol paramType = lookahead;
-            match(Lexer.SymbolType.IDENTIFIER);
-            parameters.add(new Parameter(new Identifier(paramName.getName()), new Type(paramType.getName())));
-            if (lookahead.getName().equals(",")) {
-                match(Lexer.SymbolType.SYMBOL);
-            } else {
-                break;
+    private ASTNode parseAssignmentExpression() throws ParserException {
+        ASTNode left = parseLogicalOr();
+        if (check("=")) {
+            match("=");
+            ASTNode right = parseAssignmentExpression();
+            return new Assignment(left, right);
+        }
+        return left;
+    }
+
+    private ASTNode parseLogicalOr() throws ParserException {
+        ASTNode left = parseLogicalAnd();
+        while (check("||")) {
+            String op = currentToken.getName();
+            match(op);
+            ASTNode right = parseLogicalAnd();
+            left = new BinaryExpression(op, left, right);
+        }
+        return left;
+    }
+
+    private ASTNode parseLogicalAnd() throws ParserException {
+        ASTNode left = parseEquality();
+        while (check("&&")) {
+            String op = currentToken.getName();
+            match(op);
+            ASTNode right = parseEquality();
+            left = new BinaryExpression(op, left, right);
+        }
+        return left;
+    }
+
+    private ASTNode parseEquality() throws ParserException {
+        ASTNode left = parseRelational();
+        while (check("==") || check("!=")) {
+            String op = currentToken.getName();
+            match(op);
+            ASTNode right = parseRelational();
+            left = new BinaryExpression(op, left, right);
+        }
+        return left;
+    }
+
+    private ASTNode parseRelational() throws ParserException {
+        ASTNode left = parseAdditive();
+        while (check("<") || check("<=") || check(">") || check(">=")) {
+            String op = currentToken.getName();
+            match(op);
+            ASTNode right = parseAdditive();
+            left = new BinaryExpression(op, left, right);
+        }
+        return left;
+    }
+
+    private ASTNode parseAdditive() throws ParserException {
+        ASTNode left = parseMultiplicative();
+        while (check("+") || check("-")) {
+            String op = currentToken.getName();
+            match(op);
+            ASTNode right = parseMultiplicative();
+            left = new BinaryExpression(op, left, right);
+        }
+        return left;
+    }
+
+    private ASTNode parseMultiplicative() throws ParserException {
+        ASTNode left = parseUnary();
+        while (check("*") || check("/") || check("%")) {
+            String op = currentToken.getName();
+            match(op);
+            ASTNode right = parseUnary();
+            left = new BinaryExpression(op, left, right);
+        }
+        return left;
+    }
+
+    private ASTNode parseUnary() throws ParserException {
+        if (check("-") || check("!")) {
+            String op = currentToken.getName();
+            match(op);
+            ASTNode operand = parseUnary();
+            return new UnaryExpression(op, operand);
+        }
+        return parsePrimary();
+    }
+
+    private ASTNode parsePrimary() throws ParserException {
+        if (check("(")) {
+            match("(");
+            ASTNode expr = parseExpression();
+            match(")");
+            return expr;
+        }
+        if (checkType(Lexer.SymbolType.IDENTIFIER)) {
+            String name = currentToken.getName();
+            match(name);
+
+            if (check("(")) {
+                return parseFunctionCall();
+            } else if (check("[")) {
+                match("[");
+                ASTNode index = parseExpression();
+                match("]");
+                return new ArrayAccess(new Identifier(name), index);
+            } else if (check(".")) {
+                match(".");
+                String field = currentToken.getName();
+                match(field);
+                return new FieldAccess(new Identifier(name), field);
             }
+            return new Identifier(name);
         }
-
+        if (check("array")) {
+            return parseArrayCreation();
+        }
+        if (checkType(Lexer.SymbolType.INTEGER) || checkType(Lexer.SymbolType.FLOAT) ||
+                checkType(Lexer.SymbolType.BOOLEAN) || checkType(Lexer.SymbolType.STRING)) {
+            Object value = currentToken.getName();
+            String type = currentToken.getType().toString().toLowerCase();
+            match(currentToken.getName());
+            return new Literal(value, type);
+        }
+        throw new ParserException("Unexpected token in expression", lexer.getLine(), currentToken.getName());
     }
 
-    private static class Block extends ASTree {
-        private final List<ASTree> statements;
+    private ArrayCreation parseArrayCreation() throws ParserException {
+        match("array");
+        match("[");
+        ASTNode size = parseExpression();
+        match("]");
+        match("of");
+        Type elementType = parseType();
+        return new ArrayCreation(elementType, size);
+    }
 
-        public Block(List<ASTree> statements) {
-            this.statements = statements;
+    private BlockStatement parseBlock() throws ParserException {
+        match("{");
+        List<ASTNode> statements = new ArrayList<>();
+        while (!check("}")) {
+            statements.add(parseStatement());
         }
+        match("}");
+        return new BlockStatement(statements);
+    }
 
-        @Override
-        public String toString() {
-            return "Block";
+    private Type parseType() throws ParserException {
+        if (check("array")) {
+            match("array");
+            match("[");
+            match("]");
+            Type elementType = parseType();
+            return new ArrayType(elementType, 1);
         }
+        String typeName = currentToken.getName();
+        match(typeName);
+        return PrimitiveType.fromString(typeName);
+    }
 
-        @Override
-        public void printTree(int level) {
-            super.printTree(level);
-            for (ASTree statement : statements) {
-                statement.printTree(level + 1);
-            }
+    // Utility methods
+    private void advance() {
+        currentToken = nextToken;
+        nextToken = nextNextToken;
+        nextNextToken = lexer.getNextSymbol();
+    }
+
+    private void match(String expected) throws ParserException {
+        if (!currentToken.getName().equals(expected)) {
+            throw new ParserException(
+                    "Expected '" + expected + "', found '" + currentToken.getName() + "'",
+                    lexer.getLine(),
+                    currentToken.getName()
+            );
         }
+        advance();
+    }
+
+    private boolean check(String value) {
+        return currentToken.getName().equals(value);
+    }
+
+    private boolean checkType(Lexer.SymbolType type) {
+        return currentToken.getType() == type;
+    }
+
+    private void skipSemicolons() {
+        while (check(";")) advance();
     }
 }

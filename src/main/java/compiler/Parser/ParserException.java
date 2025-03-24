@@ -1,8 +1,42 @@
 package compiler.Parser;
 
 public class ParserException extends Exception {
-    public ParserException(String wrongMatch, int line, String text) {
-        super(wrongMatch);
-        System.err.println(wrongMatch + " at line : " + line + " for " + text);
+    private final int line;
+    private final int column;
+    private final String token;
+
+    public ParserException(String message, int line, String token) {
+        super(message);
+        this.line = line;
+        this.column = -1;
+        this.token = token;
+    }
+
+    public ParserException(String message, int line, int column, String token) {
+        super(message);
+        this.line = line;
+        this.column = column;
+        this.token = token;
+    }
+
+    @Override
+    public String getMessage() {
+        return String.format("Parser error at line %d%s: %s (Token: '%s')",
+                line,
+                column >= 0 ? ":" + column : "",
+                super.getMessage(),
+                token);
+    }
+
+    public int getLine() {
+        return line;
+    }
+
+    public int getColumn() {
+        return column;
+    }
+
+    public String getToken() {
+        return token;
     }
 }
