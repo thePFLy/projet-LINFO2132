@@ -141,6 +141,21 @@ public class Parser {
         match(Lexer.SymbolType.SYMBOL); // "}"
         return new Block(statements);
     }
+    private ASTree parseLeftAssignment() throws ParserException {
+        while(!lookahead.getName().equals("=")){
+            
+        }
+    }
+    private ASTree parseRightAssignment() throws ParserException {
+
+    }
+    private ASTree parseAssignment() throws ParserException{
+        ASTree left = parseLeftAssignment();
+        match(Lexer.SymbolType.SYMBOL); // =
+        ASTree right = parseRightAssignment();
+        return new Assignment(left, right);
+
+    }
     // Parses if-else statements
     private ASTree parseIfStatement() throws ParserException {
         match(Lexer.SymbolType.KEYWORD); // "if"
