@@ -149,7 +149,7 @@ public class Parser {
         match(Lexer.SymbolType.SYMBOL);  // ")"
         ASTree ifBlock = parseBlock();
         ASTree elseBlock = null;
-        if (lookahead.getType() == Lexer.SymbolType.KEYWORD && lookahead.getValue().equals("else")) {
+        if (lookahead.getType() == Lexer.SymbolType.KEYWORD && lookahead.getName().equals("else")) {
             match(Lexer.SymbolType.KEYWORD);
             elseBlock = parseBlock();
         }
@@ -188,7 +188,7 @@ public class Parser {
         List<ASTree> arguments = new ArrayList<>();
         while (lookahead.getType() != Lexer.SymbolType.SYMBOL || !lookahead.getValue().equals(")")) {
             arguments.add(parseExpression());
-            if (lookahead.getValue().equals(",")) {
+            if (lookahead.getName().equals(",")) {
                 match(Lexer.SymbolType.SYMBOL);
             } else {
                 break;
@@ -197,13 +197,21 @@ public class Parser {
         match(Lexer.SymbolType.SYMBOL); // ")"
         return new FunctionCall(functionName, arguments);
     }
-    // Parses function declarations
-    private ASTree parseFunctionDeclaration() throws ParserException {
+
+    // Parses methods
+    private ASTree parseMethod() throws ParserException {
         match(Lexer.SymbolType.KEYWORD); // "fun"
         Symbol functionName = lookahead;
         match(Lexer.SymbolType.IDENTIFIER);
         match(Lexer.SymbolType.SYMBOL); // "("
         List<Parameter> parameters = new ArrayList<>();
+        parseParams(parameters);
+        match(Lexer.SymbolType.SYMBOL); // ")"
+        ASTree body = parseBlock();
+        return new FunctionDeclaration(new Identifier(functionName.getName()), parameters, body);
+    }
+
+    private void parseParams(List<Parameter> parameters) throws ParserException {
         while (lookahead.getType() == Lexer.SymbolType.IDENTIFIER) {
             Symbol paramName = lookahead;
             match(Lexer.SymbolType.IDENTIFIER);
@@ -216,9 +224,7 @@ public class Parser {
                 break;
             }
         }
-        match(Lexer.SymbolType.SYMBOL); // ")"
-        ASTree body = parseBlock();
-        return new FunctionDeclaration(new Identifier(functionName.getName()), parameters, body);
+
     }
 
     private static class Block extends ASTree {
