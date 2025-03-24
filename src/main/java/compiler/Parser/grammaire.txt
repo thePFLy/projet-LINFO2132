@@ -1,0 +1,37 @@
+Program       → (Declaration | Statement)* EOF
+
+Declaration   → ("final")? Type Identifier ("=" Expr)? ";"            // var/final x int = 5;
+              | "rec" Identifier "{" (Declaration ";")* "}"           // rec Point { x int; y int; }
+              | "fun" Identifier "(" ParamList ")" (Type)? CodeBlock  // fun add(a int, b int) int { ... }
+
+Type          → "int" | "float" | "string" | "bool" | Type "[]"       // int, int[], rec[]
+ParamList     → (Param ("," Param)*)?                                 // a int, b float
+Param         → Type Identifier
+
+Statement     → Expr ";"                                              // x = 1 + 2;
+              | "if" "(" Expr ")" CodeBlock ("else" CodeBlock)?       // if (x > 0) { ... } else { ... }
+              | "for" "(" (Declaration | Expr)? ";" Expr? ";" Expr? ")" CodeBlock  // for (i int = 0; i < 10; i++) { ... }
+              | "while" "(" Expr ")" CodeBlock                        // while (x < 10) { ... }
+              | "return" Expr? ";"                                    // return x + y;
+              | "break" ";"                                          // break;
+              | CodeBlock
+
+CodeBlock     → "{" Statement* "}"
+
+Expr          → AssignmentExpr
+AssignmentExpr → Identifier "=" Expr | LogicalOrExpr
+LogicalOrExpr → LogicalAndExpr ("||" LogicalAndExpr)*
+LogicalAndExpr → EqualityExpr ("&&" EqualityExpr)*
+EqualityExpr   → RelationalExpr (("==" | "!=") RelationalExpr)*
+RelationalExpr → AdditiveExpr (("<" | "<=" | ">" | ">=") AdditiveExpr)*
+AdditiveExpr   → MultiplicativeExpr (("+" | "-") MultiplicativeExpr)*
+MultiplicativeExpr → UnaryExpr (("*" | "/" | "%") UnaryExpr)*
+UnaryExpr      → ("-" | "!") UnaryExpr | PrimaryExpr
+PrimaryExpr    → Literal | Identifier | "(" Expr ")"
+                | Identifier "[" Expr "]"                             // arr[0]
+                | Identifier "." Identifier                            // point.x
+                | "array" "[" Expr "]" "of" Type                      // array [10] of int
+                | FunctionCall
+
+FunctionCall  → Identifier "(" (Expr ("," Expr)*)? ")"                // add(1, 2)
+Literal       → Integer | Float | String | Boolean | "null"
