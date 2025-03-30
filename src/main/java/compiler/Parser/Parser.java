@@ -6,7 +6,6 @@ import compiler.Parser.AST.Declarations.*;
 import compiler.Parser.AST.Expressions.*;
 import compiler.Parser.AST.Statements.*;
 import compiler.Parser.AST.Types.*;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -38,10 +37,14 @@ public class Parser {
     private ASTNode parseStatement() throws ParserException {
         skipSemicolons();
 
+        if (checkType(Lexer.SymbolType.REC) ||
+                (checkType(Lexer.SymbolType.IDENTIFIER) && nextToken.getName().equals("rec"))) {
+            return parseRecordDefinition();
+        }
+
         if (checkType(Lexer.SymbolType.KEYWORD)) {
             switch (currentToken.getName()) {
                 case "final": return parseFinalDeclaration();
-                case "rec": return parseRecordDefinition();
                 case "fun": return parseFunctionDefinition();
                 case "if": return parseIfStatement();
                 case "for": return parseForLoop();
@@ -54,25 +57,27 @@ public class Parser {
             }
         }
 
-        if (checkType(Lexer.SymbolType.TYPE)) {
+        if (checkType(Lexer.SymbolType.TYPE) ||
+                (checkType(Lexer.SymbolType.IDENTIFIER) && nextToken.getType() == Lexer.SymbolType.TYPE)) {
             return parseVariableDeclaration();
         }
 
         if (checkType(Lexer.SymbolType.IDENTIFIER)) {
+            String identifier = currentToken.getName();
+            if (nextToken.getType() == Lexer.SymbolType.IDENTIFIER || nextToken.getName().equals("=")) {
+                return parseVariableDeclaration();
+            }
+
             switch (nextToken.getName()) {
                 case "=":
                     return parseAssignment();
                 case "(":
-                    return parseFunctionCall();
+                    return parseFunctionCall(identifier);
                 case "[":
                     return parseArrayAssignment();
                 case ".":
                     return parseFieldAssignment();
             }
-        }
-
-        if (checkType(Lexer.SymbolType.TYPE)) {
-            return parseVariableDeclaration();
         }
 
         throw new ParserException(
@@ -98,18 +103,36 @@ public class Parser {
     }
 
     private RecordDeclaration parseRecordDefinition() throws ParserException {
-        match("rec");
-        String name = currentToken.getName();
-        match(name);
+        String name;
+
+        //rec {...}"
+        if (checkType(Lexer.SymbolType.REC)) {
+            name = currentToken.getName();
+            advance();
+            match("rec");
+        }
+        //"rec Point {...}"
+        else if (check("rec")) {
+            match("rec");
+            name = currentToken.getName();
+            match(name);
+        } else {
+            throw new ParserException("Invalid record declaration", lexer.getLine(), currentToken.getName());
+        }
+
         match("{");
 
         List<FieldDeclaration> fields = new ArrayList<>();
         while (!check("}")) {
-            if (checkType(Lexer.SymbolType.IDENTIFIER) && nextToken.getType() == Lexer.SymbolType.TYPE) {
+            if (checkType(Lexer.SymbolType.IDENTIFIER)) {
                 String fieldName = currentToken.getName();
                 match(fieldName);
-                Type fieldType = parseType();
-                fields.add(new FieldDeclaration(fieldName, fieldType));
+                if (checkType(Lexer.SymbolType.TYPE)) {
+                    Type fieldType = parseType();
+                    fields.add(new FieldDeclaration(fieldName, fieldType));
+                } else {
+                    throw new ParserException("Expected type after field name", lexer.getLine(), currentToken.getName());
+                }
             } else {
                 Type fieldType = parseType();
                 String fieldName = currentToken.getName();
@@ -218,18 +241,28 @@ public class Parser {
     }
 
     private VariableDeclaration parseVariableDeclaration() throws ParserException {
-        Type type = parseType();
-        String identifier = currentToken.getName();
-        match(identifier);
+        Type type;
+        String identifier;
+
+        if (checkType(Lexer.SymbolType.TYPE) || checkType(Lexer.SymbolType.REC)) {
+            type = parseType();
+            identifier = currentToken.getName();
+            match(identifier);
+        }
+        else if (checkType(Lexer.SymbolType.IDENTIFIER) &&
+                (nextToken.getType() == Lexer.SymbolType.TYPE ||
+                        nextToken.getType() == Lexer.SymbolType.REC)) {
+            identifier = currentToken.getName();
+            match(identifier);
+            type = parseType();
+        } else {
+            throw new ParserException("Invalid variable declaration", lexer.getLine(), currentToken.getName());
+        }
 
         ASTNode initialValue = null;
         if (check("=")) {
             match("=");
-            if (check("array")) {
-                initialValue = parseArrayCreation();
-            } else {
-                initialValue = parseExpression();
-            }
+            initialValue = parseExpression();
         }
         match(";");
         return new VariableDeclaration(type, identifier, false, initialValue);
@@ -285,9 +318,7 @@ public class Parser {
         return new Assignment(new FieldAccess(new Identifier(recordName), fieldName), value);
     }
 
-    private FunctionCall parseFunctionCall() throws ParserException {
-        String name = currentToken.getName();
-        match(name);
+    private FunctionCall parseFunctionCall(String name) throws ParserException {
         match("(");
         List<ASTNode> args = new ArrayList<>();
         while (!check(")")) {
@@ -297,7 +328,6 @@ public class Parser {
             }
         }
         match(")");
-        match(";");
         return new FunctionCall(name, args);
     }
 
@@ -398,12 +428,34 @@ public class Parser {
             match(")");
             return expr;
         }
-        if (checkType(Lexer.SymbolType.IDENTIFIER)) {
+        if (checkType(Lexer.SymbolType.IDENTIFIER) || checkType(Lexer.SymbolType.REC)) {
             String name = currentToken.getName();
+            Lexer.SymbolType currentType = currentToken.getType();
             match(name);
 
             if (check("(")) {
-                return parseFunctionCall();
+                if (currentType == Lexer.SymbolType.REC) {
+                    match("(");
+                    List<ASTNode> args = new ArrayList<>();
+                    while (!check(")")) {
+                        args.add(parseExpression());
+                        if (!check(")")) {
+                            match(",");
+                        }
+                    }
+                    match(")");
+                    return new RecordConstructorNode(name, args);
+                } else {
+                    List<ASTNode> args = new ArrayList<>();
+                    while (!check(")")) {
+                        args.add(parseExpression());
+                        if (!check(")")) {
+                            match(",");
+                        }
+                    }
+                    match(")");
+                    return new FunctionCall(name, args);
+                }
             } else if (check("[")) {
                 match("[");
                 ASTNode index = parseExpression();

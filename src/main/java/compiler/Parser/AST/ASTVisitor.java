@@ -28,6 +28,7 @@ public interface ASTVisitor<T> {
     T visit(TypeConversion expr);
     T visit(FieldAccess expr);
     T visit(ArrayCreation expr);
+    T visit(RecordConstructorNode expr);
     T visit(ProgramNode node);
     // statements
     T visit(BlockStatement stmt);

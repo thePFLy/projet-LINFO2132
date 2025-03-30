@@ -1,4 +1,5 @@
 package compiler.Lexer;
+
 import java.io.IOException;
 import java.io.PushbackReader;
 import java.io.Reader;
@@ -45,7 +46,6 @@ public class Lexer {
         }
     }
 
-
     private void advance() {
         try {
             currentChar = reader.read();
@@ -90,13 +90,17 @@ public class Lexer {
             if (Arrays.asList(BOOLEAN_VALUES).contains(word)) return new Symbol(SymbolType.BOOLEAN, word);
             if (BUILT_IN_FUNCTIONS.contains(word)) return new Symbol(SymbolType.IDENTIFIER, word);
 
+            // Handle record type names (start with uppercase)
             if (Character.isUpperCase(word.charAt(0))) {
-                return new Symbol(SymbolType.REC, word);
+                if (currentChar == '(') {
+                    return new Symbol(SymbolType.IDENTIFIER, word);
+                } else {
+                    return new Symbol(SymbolType.REC, word);
+                }
             }
 
             return new Symbol(SymbolType.IDENTIFIER, word);
         }
-
 
         // Field operator (.)
         if (currentChar == '.') {
@@ -109,7 +113,7 @@ public class Lexer {
             StringBuilder sb = new StringBuilder();
             boolean isFloat = false;
 
-            // .125
+            // Handle .125 case
             if (currentChar == '.') {
                 if (!Character.isDigit(nextCharView())) {
                     LexerError.reportError(line, column, (char) currentChar);
@@ -127,12 +131,12 @@ public class Lexer {
                 advance();
             }
 
-            // 1 more .
+            // Handle second . in floats
             if (currentChar == '.') {
                 if (isFloat) {
                     return new Symbol(SymbolType.FLOAT, sb.toString());
                 }
-                sb.append((char) currentChar); // Ajouter le point
+                sb.append((char) currentChar);
                 isFloat = true;
                 advance();
                 while (Character.isDigit(currentChar)) {
@@ -163,7 +167,6 @@ public class Lexer {
                 }
                 advance();
             }
-            // not closed '
             if (currentChar == -1) {
                 LexerError.reportError(line, column, ' ');
                 return new Symbol(SymbolType.STRING, sb.toString());
@@ -178,6 +181,7 @@ public class Lexer {
             sb.append((char) currentChar);
             advance();
 
+            // Handle compound operators (==, !=, <=, >=, &&, ||)
             if ((sb.charAt(0) == '=' || sb.charAt(0) == '!' || sb.charAt(0) == '<' || sb.charAt(0) == '>') && currentChar == '=') {
                 sb.append((char) currentChar);
                 advance();
