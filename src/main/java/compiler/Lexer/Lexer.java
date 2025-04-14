@@ -92,11 +92,7 @@ public class Lexer {
 
             // Handle record type names (start with uppercase)
             if (Character.isUpperCase(word.charAt(0))) {
-                if (currentChar == '(') {
-                    return new Symbol(SymbolType.IDENTIFIER, word);
-                } else {
-                    return new Symbol(SymbolType.REC, word);
-                }
+                return new Symbol(SymbolType.IDENTIFIER, word);
             }
 
             return new Symbol(SymbolType.IDENTIFIER, word);
