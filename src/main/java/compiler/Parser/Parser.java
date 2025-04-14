@@ -40,6 +40,15 @@ public class Parser {
     private ASTNode parseStatement() throws ParserException {
         skipSemicolons();
 
+        if (checkType(Lexer.SymbolType.IDENTIFIER)) {
+            String identifier = currentToken.getName();
+            if (nextToken != null && nextToken.getName().equals("(")) {
+                FunctionCall call = parseFunctionCall(identifier);
+                match(";");
+                return new FunctionCallStatement(call);
+            }
+        }
+
         if (check("rec") || (checkType(Lexer.SymbolType.IDENTIFIER) && nextToken.getName().equals("rec"))) {
             return parseRecordDefinition();
         }
@@ -79,8 +88,6 @@ public class Parser {
             switch (nextToken.getName()) {
                 case "=":
                     return parseAssignment();
-                case "(":
-                    return parseFunctionCall(identifier);
                 case "[":
                     return parseArrayAssignment();
                 case ".":
@@ -348,7 +355,9 @@ public class Parser {
     }
 
     private FunctionCall parseFunctionCall(String name) throws ParserException {
+        advance();
         match("(");
+
         List<ASTNode> args = new ArrayList<>();
         while (!check(")")) {
             args.add(parseExpression());
