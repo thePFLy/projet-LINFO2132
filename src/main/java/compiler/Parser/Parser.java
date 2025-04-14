@@ -42,6 +42,11 @@ public class Parser {
 
         if (checkType(Lexer.SymbolType.IDENTIFIER)) {
             String identifier = currentToken.getName();
+
+            if (nextToken != null && nextToken.getName().equals("=")) {
+                return parseAssignment();
+            }
+
             if (nextToken != null && nextToken.getName().equals("(")) {
                 FunctionCall call = parseFunctionCall(identifier);
                 match(";");
@@ -240,18 +245,19 @@ public class Parser {
         match("for");
         match("(");
 
-        ASTNode init = parseForInit();
-        match(";");
+        ASTNode init = parseExpression();
+        match(",");
+        ASTNode start = parseExpression();
+        match(",");
+        ASTNode end = parseExpression();
+        match(",");
+        ASTNode step = parseExpression();
 
-        ASTNode condition = check(";") ? null : parseExpression();
-        match(";");
-
-        ASTNode update = check(")") ? null : parseExpression();
         match(")");
 
         BlockStatement body = parseBlock();
 
-        return new ForLoop(init, condition, update, body);
+        return new ForLoop(init, start, end, step, body);
     }
 
     private ASTNode parseForInit() throws ParserException {

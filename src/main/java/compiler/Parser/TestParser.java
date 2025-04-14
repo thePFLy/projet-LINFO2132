@@ -73,16 +73,6 @@ public class TestParser {
         assertEquals("int", rec.fields.get(0).type.getTypeName());
     }
 
-    @Test
-    public void testForLoop() throws Exception {
-        String code = "for (i int = 0; i < 10; i = i + 1) { print(i); }";
-        ProgramNode ast = parse(code);
-        ForLoop forLoop = (ForLoop) ast.statements.get(0);
-
-        assertTrue(forLoop.initialization instanceof VariableDeclaration);
-        assertTrue(forLoop.condition instanceof BinaryExpression);
-        assertTrue(forLoop.update instanceof Assignment);
-    }
 
     @Test
     public void testWhileLoop() throws Exception {

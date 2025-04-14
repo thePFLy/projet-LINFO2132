@@ -4,15 +4,17 @@ import compiler.Parser.AST.ASTNode;
 import compiler.Parser.AST.ASTVisitor;
 
 public class ForLoop implements ASTNode {
-    public final ASTNode initialization;
-    public final ASTNode condition;
-    public final ASTNode update;
-    public final ASTNode body;
+    public final ASTNode init;
+    public final ASTNode start;
+    public final ASTNode end;
+    public final ASTNode step;
+    public final BlockStatement body;
 
-    public ForLoop(ASTNode initialization, ASTNode condition, ASTNode update, ASTNode body) {
-        this.initialization = initialization;
-        this.condition = condition;
-        this.update = update;
+    public ForLoop(ASTNode init, ASTNode start, ASTNode end, ASTNode step, BlockStatement body) {
+        this.init = init;
+        this.start = start;
+        this.end = end;
+        this.step = step;
         this.body = body;
     }
 
@@ -23,7 +25,7 @@ public class ForLoop implements ASTNode {
 
     @Override
     public String toString() {
-        return String.format("For(init=%s, cond=%s, update=%s, body=%s)",
-                initialization, condition, update, body);
+        return String.format("For(init=%s, start=%s, end=%s, step=%s, body=%s)",
+                init, start, end, step, body);
     }
 }
